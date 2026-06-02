@@ -80,6 +80,10 @@
         linear-gradient(135deg, #050302, #23130c 50%, #fb3b12);
       color: var(--white);
       transition: .55s ease;
+      animation: splashAutoHide .45s ease 1.25s forwards;
+    }
+    @keyframes splashAutoHide {
+      to { opacity: 0; visibility: hidden; pointer-events: none; transform: scale(1.02); }
     }
     .splash.hide { opacity: 0; visibility: hidden; transform: scale(1.02); }
     .splash__logo,
@@ -924,15 +928,15 @@
 
         <div class="testimonials-grid">
           <article class="testimonial reveal">
-            <strong>"Pedido mais rápido"</strong>
+            <strong>“Pedido mais rápido”</strong>
             <p>O cliente já chega no WhatsApp sabendo o que quer, reduzindo perguntas repetidas.</p>
           </article>
           <article class="testimonial reveal">
-            <strong>"Cardápio organizado"</strong>
+            <strong>“Cardápio organizado”</strong>
             <p>Combos, porções e bebidas ficam separados por categoria para facilitar a escolha.</p>
           </article>
           <article class="testimonial reveal">
-            <strong>"Mais presença digital"</strong>
+            <strong>“Mais presença digital”</strong>
             <p>Uma página própria aumenta a confiança e fortalece a marca fora do Instagram.</p>
           </article>
         </div>
@@ -999,6 +1003,566 @@
     🛒 <span id="cartBadge">0</span>
   </button>
 
-  <script src="script.js"></script>
+  <div class="modal" id="productModal" aria-hidden="true">
+    <div class="modal__overlay" data-close-modal></div>
+    <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal__close" data-close-modal aria-label="Fechar detalhes do produto">×</button>
+      <img id="modalImage" src="" alt="">
+      <div class="modal__body">
+        <span id="modalCategory"></span>
+        <h3 id="modalTitle"></h3>
+        <p id="modalDescription"></p>
+        <strong id="modalPrice"></strong>
+        <button id="modalAdd" class="btn btn-primary">Adicionar ao pedido</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div>
+      <strong>Caverna da Gordura</strong>
+      <p>Prévia demonstrativa de cardápio digital para hamburgueria.</p>
+    </div>
+    <a href="https://wa.me/5516982135080?text=Olá! Vim pelo site da Caverna da Gordura." target="_blank" rel="noopener">WhatsApp</a>
+  </footer>
+
+  <section class="admin-overlay" id="adminOverlay">
+    <div class="admin-lock" id="adminLock">
+      <div class="admin-lock__box">
+        <a href="#" class="brand">
+          <span>Caverna</span>
+          <small>Painel oculto</small>
+        </a>
+
+        <h2>Área administrativa</h2>
+        <p>Digite a senha para acessar o painel demonstrativo. Para abrir esta tela, digite CAVE no teclado.</p>
+
+        <form id="adminLogin">
+          <input type="password" id="adminPassword" placeholder="Senha do administrador" autocomplete="current-password" required>
+          <button class="btn btn-primary" type="submit">Entrar</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="admin-dashboard" id="adminDashboard">
+      <div class="admin-top">
+        <a href="#" class="brand">
+          <span>Caverna</span>
+          <small>Admin demonstrativo</small>
+        </a>
+        <button class="btn btn-secondary" id="closeAdmin">Fechar painel</button>
+      </div>
+
+      <div class="admin-grid">
+        <form class="admin-card admin-form" id="productForm">
+          <h2>Novo produto</h2>
+          <input type="text" id="productName" placeholder="Nome do produto" required>
+          <textarea id="productDescription" placeholder="Descrição" required></textarea>
+          <select id="productCategory" required>
+            <option value="hamburgueres">Hambúrgueres</option>
+            <option value="smash">Smash</option>
+            <option value="combos">Combos</option>
+            <option value="porcoes">Porções</option>
+            <option value="bebidas">Bebidas</option>
+          </select>
+          <input type="number" step="0.01" id="productPrice" placeholder="Preço" required>
+          <input type="url" id="productImage" placeholder="URL da imagem">
+          <button class="btn btn-primary" type="submit">Salvar produto</button>
+          <button class="btn btn-secondary" type="button" id="resetDemo">Resetar produtos demo</button>
+        </form>
+
+        <div class="admin-card">
+          <h2>Produtos cadastrados</h2>
+          <div class="admin-products" id="adminProducts"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const WHATSAPP_NUMBER = "5516982135080";
+    const ADMIN_SECRET = "cave";
+    const ADMIN_PASSWORD = "caverna2026";
+
+    const DEMO_PRODUCTS = [
+      {
+        id: "burger-classico",
+        name: "Caverna Clássico",
+        description: "Pão brioche, hambúrguer artesanal, queijo, alface, tomate e molho da casa.",
+        category: "hamburgueres",
+        price: 28.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "burger-bacon",
+        name: "Bacon da Caverna",
+        description: "Carne suculenta, cheddar, bacon crocante, cebola e molho especial.",
+        category: "hamburgueres",
+        price: 34.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "smash-duplo",
+        name: "Smash Duplo",
+        description: "Dois smash burgers, queijo derretido, picles e molho da casa.",
+        category: "smash",
+        price: 31.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "smash-cheddar",
+        name: "Smash Cheddar",
+        description: "Smash selado na chapa, cheddar cremoso e cebola caramelizada.",
+        category: "smash",
+        price: 29.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "combo-caverna",
+        name: "Combo Caverna",
+        description: "Hambúrguer, batata e bebida. Ideal para pedir completo.",
+        category: "combos",
+        price: 42.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "combo-casal",
+        name: "Combo Casal",
+        description: "Dois lanches, porção de batata e duas bebidas.",
+        category: "combos",
+        price: 79.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "batata-cheddar",
+        name: "Batata Cheddar Bacon",
+        description: "Batata frita crocante com cheddar cremoso e bacon.",
+        category: "porcoes",
+        price: 24.90,
+        available: true,
+        image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=82"
+      },
+      {
+        id: "refrigerante",
+        name: "Refrigerante Lata",
+        description: "Bebida gelada para acompanhar seu combo.",
+        category: "bebidas",
+        price: 6.00,
+        available: true,
+        image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=900&q=82"
+      }
+    ];
+
+    function getProducts() {
+      const saved = localStorage.getItem("caverna_products_v1");
+      if (!saved) {
+        localStorage.setItem("caverna_products_v1", JSON.stringify(DEMO_PRODUCTS));
+        return DEMO_PRODUCTS;
+      }
+      try {
+        return JSON.parse(saved);
+      } catch {
+        localStorage.setItem("caverna_products_v1", JSON.stringify(DEMO_PRODUCTS));
+        return DEMO_PRODUCTS;
+      }
+    }
+
+    function saveProducts(products) {
+      localStorage.setItem("caverna_products_v1", JSON.stringify(products));
+    }
+
+    function formatCurrency(value) {
+      return Number(value).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+      });
+    }
+
+    function categoryLabel(category) {
+      const labels = {
+        hamburgueres: "Hambúrguer",
+        smash: "Smash",
+        combos: "Combo",
+        porcoes: "Porção",
+        bebidas: "Bebida"
+      };
+      return labels[category] || "Produto";
+    }
+
+    function createWhatsAppLink(message) {
+      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    }
+
+    const menuToggle = document.querySelector("#menuToggle");
+    const nav = document.querySelector("#nav");
+    const splash = document.querySelector("#splash");
+    const productGrid = document.querySelector("#productGrid");
+    const filters = document.querySelectorAll(".filter");
+
+    const cart = document.querySelector("#cart");
+    const openCart = document.querySelector("#openCart");
+    const closeCart = document.querySelector("#closeCart");
+    const cartItems = document.querySelector("#cartItems");
+    const cartCount = document.querySelector("#cartCount");
+    const cartBadge = document.querySelector("#cartBadge");
+    const cartTotal = document.querySelector("#cartTotal");
+    const sendOrder = document.querySelector("#sendOrder");
+
+    const modal = document.querySelector("#productModal");
+    const modalImage = document.querySelector("#modalImage");
+    const modalCategory = document.querySelector("#modalCategory");
+    const modalTitle = document.querySelector("#modalTitle");
+    const modalDescription = document.querySelector("#modalDescription");
+    const modalPrice = document.querySelector("#modalPrice");
+    const modalAdd = document.querySelector("#modalAdd");
+
+    let currentCategory = "todos";
+    let cartState = [];
+    let selectedProduct = null;
+    let lastFocusedElement = null;
+
+    setTimeout(() => splash?.classList.add("hide"), 1050);
+
+    menuToggle?.addEventListener("click", () => {
+      const isOpen = nav.classList.toggle("open");
+      menuToggle.classList.toggle("open", isOpen);
+      menuToggle.setAttribute("aria-expanded", String(isOpen));
+
+      if (isOpen) {
+        nav.querySelector("a")?.focus();
+      }
+    });
+
+    nav?.addEventListener("click", (event) => {
+      if (event.target.tagName === "A") {
+        nav.classList.remove("open");
+        menuToggle.classList.remove("open");
+        menuToggle.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    function renderProducts() {
+      const products = getProducts().filter(product => product.available);
+      const filtered = currentCategory === "todos"
+        ? products
+        : products.filter(product => product.category === currentCategory);
+
+      productGrid.innerHTML = filtered.map(product => `
+        <article class="product-card reveal" data-id="${product.id}">
+          <img loading="lazy" src="${product.image}" alt="${product.name}">
+          <div class="product-card__body">
+            <span>${categoryLabel(product.category)}</span>
+            <h3>${product.name}</h3>
+            <p>${product.description}</p>
+            <strong>${formatCurrency(product.price)}</strong>
+            <div class="product-card__actions">
+              <button class="btn-mini" data-view="${product.id}">Ver detalhes</button>
+              <button class="btn-mini btn-mini--primary" data-add="${product.id}">Adicionar</button>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      bindProductButtons();
+      revealElements();
+    }
+
+    filters.forEach(button => {
+      button.addEventListener("click", () => {
+        filters.forEach(btn => btn.classList.remove("active"));
+        button.classList.add("active");
+        currentCategory = button.dataset.category;
+        renderProducts();
+      });
+    });
+
+    function bindProductButtons() {
+      document.querySelectorAll("[data-add]").forEach(button => {
+        button.addEventListener("click", () => addToCart(button.dataset.add));
+      });
+
+      document.querySelectorAll("[data-view]").forEach(button => {
+        button.addEventListener("click", () => openProductModal(button.dataset.view));
+      });
+    }
+
+    function addToCart(productId) {
+      const product = getProducts().find(item => item.id === productId);
+      if (!product) return;
+
+      const existing = cartState.find(item => item.id === productId);
+
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        cartState.push({ ...product, quantity: 1 });
+      }
+
+      renderCart();
+      cart.classList.add("open");
+    }
+
+    function removeFromCart(productId) {
+      cartState = cartState.filter(item => item.id !== productId);
+      renderCart();
+    }
+
+    function changeQuantity(productId, change) {
+      const item = cartState.find(product => product.id === productId);
+      if (!item) return;
+
+      item.quantity += change;
+
+      if (item.quantity <= 0) {
+        removeFromCart(productId);
+        return;
+      }
+
+      renderCart();
+    }
+
+    function renderCart() {
+      const totalItems = cartState.reduce((sum, item) => sum + item.quantity, 0);
+      const total = cartState.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      cartBadge.textContent = totalItems;
+      cartCount.textContent = `${totalItems} ${totalItems === 1 ? "item" : "itens"}`;
+      cartTotal.textContent = formatCurrency(total);
+
+      if (cartState.length === 0) {
+        cartItems.innerHTML = `<p class="empty-cart">Seu pedido ainda está vazio.</p>`;
+        return;
+      }
+
+      cartItems.innerHTML = cartState.map(item => `
+        <div class="cart-item">
+          <img src="${item.image}" alt="${item.name}">
+          <div>
+            <strong>${item.name}</strong>
+            <span>${formatCurrency(item.price)} cada</span>
+            <div class="qty">
+              <button data-minus="${item.id}" aria-label="Diminuir quantidade de ${item.name}">−</button>
+              <b>${item.quantity}</b>
+              <button data-plus="${item.id}" aria-label="Aumentar quantidade de ${item.name}">+</button>
+              <button data-remove="${item.id}" class="remove">remover</button>
+            </div>
+          </div>
+        </div>
+      `).join("");
+
+      document.querySelectorAll("[data-minus]").forEach(btn => btn.addEventListener("click", () => changeQuantity(btn.dataset.minus, -1)));
+      document.querySelectorAll("[data-plus]").forEach(btn => btn.addEventListener("click", () => changeQuantity(btn.dataset.plus, 1)));
+      document.querySelectorAll("[data-remove]").forEach(btn => btn.addEventListener("click", () => removeFromCart(btn.dataset.remove)));
+    }
+
+    openCart?.addEventListener("click", () => cart.classList.add("open"));
+    closeCart?.addEventListener("click", () => cart.classList.remove("open"));
+
+    sendOrder?.addEventListener("click", () => {
+      if (cartState.length === 0) {
+        alert("Adicione pelo menos um produto ao pedido.");
+        return;
+      }
+
+      const lines = cartState.map(item => `• ${item.quantity}x ${item.name} - ${formatCurrency(item.price * item.quantity)}`);
+      const total = cartState.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      const message = `Olá! Vim pelo site/cardápio da Caverna da Gordura e quero fazer este pedido:
+
+${lines.join("\n")}
+
+Total estimado: ${formatCurrency(total)}
+
+Pode confirmar disponibilidade, entrega/retirada e forma de pagamento?`;
+
+      window.open(createWhatsAppLink(message), "_blank");
+    });
+
+    function openProductModal(productId) {
+      selectedProduct = getProducts().find(item => item.id === productId);
+      if (!selectedProduct) return;
+
+      lastFocusedElement = document.activeElement;
+
+      modalImage.src = selectedProduct.image;
+      modalImage.alt = selectedProduct.name;
+      modalCategory.textContent = categoryLabel(selectedProduct.category);
+      modalTitle.textContent = selectedProduct.name;
+      modalDescription.textContent = selectedProduct.description;
+      modalPrice.textContent = formatCurrency(selectedProduct.price);
+
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      modal.querySelector(".modal__close")?.focus();
+    }
+
+    function closeModal() {
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      lastFocusedElement?.focus();
+    }
+
+    modalAdd?.addEventListener("click", () => {
+      if (!selectedProduct) return;
+      addToCart(selectedProduct.id);
+      closeModal();
+    });
+
+    document.querySelectorAll("[data-close-modal]").forEach(element => {
+      element.addEventListener("click", closeModal);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeModal();
+        cart.classList.remove("open");
+      }
+    });
+
+    function revealElements() {
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (prefersReducedMotion) {
+        document.querySelectorAll(".reveal").forEach(element => element.classList.add("show"));
+        return;
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("show");
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -70px 0px" });
+
+      document.querySelectorAll(".reveal:not(.show)").forEach(element => observer.observe(element));
+    }
+
+    const adminOverlay = document.querySelector("#adminOverlay");
+    const adminLock = document.querySelector("#adminLock");
+    const adminDashboard = document.querySelector("#adminDashboard");
+    const adminLogin = document.querySelector("#adminLogin");
+    const adminPassword = document.querySelector("#adminPassword");
+    const closeAdmin = document.querySelector("#closeAdmin");
+    const productForm = document.querySelector("#productForm");
+    const adminProducts = document.querySelector("#adminProducts");
+    const resetDemo = document.querySelector("#resetDemo");
+
+    let secretTyped = "";
+
+    document.addEventListener("keydown", (event) => {
+      if (event.target.matches("input, textarea, select")) return;
+
+      secretTyped += event.key.toLowerCase();
+      secretTyped = secretTyped.slice(-ADMIN_SECRET.length);
+
+      if (secretTyped === ADMIN_SECRET) {
+        adminOverlay.classList.add("open");
+        adminPassword?.focus();
+      }
+    });
+
+    adminLogin?.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      if (adminPassword.value === ADMIN_PASSWORD) {
+        adminLock.style.display = "none";
+        adminDashboard.classList.add("open");
+        renderAdminProducts();
+      } else {
+        alert("Senha incorreta.");
+        adminPassword.value = "";
+        adminPassword.focus();
+      }
+    });
+
+    closeAdmin?.addEventListener("click", () => {
+      adminOverlay.classList.remove("open");
+      adminLock.style.display = "";
+      adminDashboard.classList.remove("open");
+      adminPassword.value = "";
+    });
+
+    productForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const products = getProducts();
+      const image = document.querySelector("#productImage").value.trim()
+        || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=82";
+
+      products.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        name: document.querySelector("#productName").value.trim(),
+        description: document.querySelector("#productDescription").value.trim(),
+        category: document.querySelector("#productCategory").value,
+        price: Number(document.querySelector("#productPrice").value),
+        available: true,
+        image
+      });
+
+      saveProducts(products);
+      productForm.reset();
+      renderAdminProducts();
+      renderProducts();
+      alert("Produto salvo na demonstração.");
+    });
+
+    resetDemo?.addEventListener("click", () => {
+      saveProducts(DEMO_PRODUCTS);
+      renderAdminProducts();
+      renderProducts();
+    });
+
+    function renderAdminProducts() {
+      const products = getProducts();
+
+      adminProducts.innerHTML = products.map(product => `
+        <article class="admin-product">
+          <img src="${product.image}" alt="${product.name}">
+          <div>
+            <strong>${product.name}</strong>
+            <span>${categoryLabel(product.category)} • ${formatCurrency(product.price)}</span>
+            <small>${product.available ? "Disponível" : "Indisponível"}</small>
+          </div>
+          <button data-delete-admin="${product.id}">Excluir</button>
+        </article>
+      `).join("");
+
+      document.querySelectorAll("[data-delete-admin]").forEach(button => {
+        button.addEventListener("click", () => {
+          const filtered = getProducts().filter(product => product.id !== button.dataset.deleteAdmin);
+          saveProducts(filtered);
+          renderAdminProducts();
+          renderProducts();
+        });
+      });
+    }
+
+    renderProducts();
+    renderCart();
+    revealElements();
+  </script>
+
+  <script>
+    // Fallback anti-travamento do carregamento
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        var splash = document.getElementById("splash");
+        if (splash) {
+          splash.style.opacity = "0";
+          splash.style.visibility = "hidden";
+          splash.style.pointerEvents = "none";
+        }
+      }, 1500);
+    });
+  </script>
+
 </body>
 </html>
